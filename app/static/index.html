@@ -252,6 +252,7 @@ function track(batchId, links) {
     else if (ev.type === "row" && result) result.hospitals[ev.row.row - 1] = ev.row;
     else if (ev.type === "job" && result) { result.status = ev.status; if (ev.result) result = ev.result; }
     else if (ev.type === "error") toast(ev.message);
+    if (result && TERMINAL.has(result.status)) $("batch-channel").textContent = "finished";
     render();
   };
   socket.onclose = () => {

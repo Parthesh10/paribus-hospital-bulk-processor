@@ -6,7 +6,9 @@ creates every row upstream **concurrently** under one batch id, and **activates 
 when every row exists**. Progress is live over WebSocket or polling. Failed batches can be
 **resumed** (without duplicates) or **rolled back**.
 
-- **Live:** see [SUBMISSION.md](SUBMISSION.md) for the deployed URL. UI at `/`, OpenAPI docs at `/docs`.
+- **Live:** <https://hospital-bulk-processor-jvl7.onrender.com> (UI at `/`, OpenAPI docs at [`/docs`](https://hospital-bulk-processor-jvl7.onrender.com/docs)).
+  Free tier: the first request after ~15 min idle takes ~30-60 s while the service wakes.
+- **Repository:** <https://github.com/Parthesh10/paribus-hospital-bulk-processor>
 - **Design rationale:** [DECISIONS.md](DECISIONS.md), including the upstream API findings that shaped it.
 
 | | |
