@@ -1,0 +1,8 @@
+# Direct runtime dependencies. `requirements.txt` is the fully pinned lock generated from this:
+#   uv pip compile --universal --python-version 3.12 requirements.in -o requirements.txt
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-multipart==0.0.32

@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    image: hospital-bulk-processor:latest
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      UPSTREAM_BASE_URL: https://hospital-directory.onrender.com
+      UPSTREAM_MAX_CONCURRENCY: "20"
+      UPSTREAM_READ_TIMEOUT: "30"
+      UPSTREAM_MAX_ATTEMPTS: "4"
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+    # Healthcheck is defined in the Dockerfile (GET /health).
+    stop_grace_period: 30s # > SHUTDOWN_GRACE_SECONDS so running batches can drain
+    restart: unless-stopped

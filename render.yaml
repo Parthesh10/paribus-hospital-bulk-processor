@@ -1,0 +1,26 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: hospital-bulk-processor
+    runtime: docker
+    plan: free
+    region: oregon # same region as the upstream Hospital Directory API: lowest latency
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Render injects PORT; the container binds 0.0.0.0:$PORT.
+      - key: UPSTREAM_BASE_URL
+        value: https://hospital-directory.onrender.com
+      - key: UPSTREAM_MAX_CONCURRENCY
+        value: "20"
+      - key: UPSTREAM_READ_TIMEOUT
+        value: "30"
+      - key: UPSTREAM_COLD_START_TIMEOUT
+        value: "90"
+      - key: UPSTREAM_MAX_ATTEMPTS
+        value: "4"
+      - key: LOG_FORMAT
+        value: json
+      - key: LOG_LEVEL
+        value: INFO
