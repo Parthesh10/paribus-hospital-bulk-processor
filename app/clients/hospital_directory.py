@@ -137,7 +137,11 @@ class HospitalDirectoryClient:
                 return True
             started = time.monotonic()
             try:
-                await self._request("GET", "/", request_timeout=self._cold_start_timeout)
+                # One long attempt absorbs a cold start; a second covers a blip. More would
+                # only delay batches when upstream is genuinely down.
+                await self._request(
+                    "GET", "/", request_timeout=self._cold_start_timeout, max_attempts=2
+                )
             except UpstreamError as exc:
                 logger.warning("upstream warm-up failed", extra={"error": str(exc)})
                 return False

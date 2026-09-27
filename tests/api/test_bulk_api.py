@@ -140,6 +140,15 @@ def test_oversized_upload_is_413(api: TestClient) -> None:
     assert response.json()["error"]["code"] == "payload_too_large"
 
 
+def test_huge_upload_is_rejected_before_parsing(api: TestClient, fake: FakeUpstream) -> None:
+    huge = b"name,address\n" + b"A,B\n" * 400_000  # ~1.6 MB, far past limit + envelope
+    response = api.post("/hospitals/bulk", files=upload(huge))
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "payload_too_large"
+    assert response.headers["X-Request-ID"]
+    assert fake.calls == []
+
+
 def test_wrong_file_type_is_rejected(api: TestClient) -> None:
     response = api.post(
         "/hospitals/bulk", files=upload(b"%PDF-1.7", name="h.pdf", ctype="application/pdf")

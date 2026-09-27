@@ -1,5 +1,6 @@
-"""Request-id middleware (pure ASGI, so it also covers WebSockets and has no streaming caveats)."""
+"""Pure ASGI middleware (no BaseHTTPMiddleware: covers WebSockets, no streaming caveats)."""
 
+import json
 import re
 from uuid import uuid4
 
@@ -9,6 +10,48 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.logging_config import request_id_var
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+
+
+class BodySizeLimitMiddleware:
+    """Reject oversized request bodies *before* they are parsed.
+
+    Starlette's multipart parser spools the entire upload to a temp file before the endpoint
+    runs, so the endpoint's own size check alone would still let a client make us write
+    gigabytes to disk. Rejecting on `Content-Length` avoids that. (Chunked uploads without a
+    length are still bounded by the endpoint check; a reverse proxy limit is the real fix.)
+    """
+
+    def __init__(self, app: ASGIApp, *, max_body_bytes: int) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            length = dict(scope.get("headers") or []).get(b"content-length", b"")
+            if length.isdigit() and int(length) > self.max_body_bytes:
+                body = json.dumps(
+                    {
+                        "error": {
+                            "code": "payload_too_large",
+                            "message": f"Request body exceeds {self.max_body_bytes} bytes.",
+                            "details": None,
+                        }
+                    }
+                ).encode()
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 413,
+                        "headers": [
+                            (b"content-type", b"application/json"),
+                            (b"content-length", str(len(body)).encode()),
+                            (b"connection", b"close"),
+                        ],
+                    }
+                )
+                await send({"type": "http.response.body", "body": body})
+                return
+        await self.app(scope, receive, send)
 
 
 class RequestIdMiddleware:

@@ -17,7 +17,7 @@ from app.clients.hospital_directory import HospitalDirectoryClient
 from app.config import Settings, get_settings
 from app.errors import register_exception_handlers
 from app.logging_config import configure_logging
-from app.middleware import RequestIdMiddleware
+from app.middleware import BodySizeLimitMiddleware, RequestIdMiddleware
 from app.repositories.batch_repository import InMemoryBatchRepository
 from app.services.bulk_processor import BulkProcessor
 from app.services.csv_validator import CsvValidator
@@ -25,6 +25,7 @@ from app.services.job_runner import JobRunner
 from app.services.progress import ProgressBroker
 
 STATIC_DIR = Path(__file__).parent / "static"
+MULTIPART_OVERHEAD_BYTES = 64 * 1024  # boundaries + part headers around the CSV itself
 
 DESCRIPTION = """
 Bulk-import hospitals from a CSV into the
@@ -98,6 +99,11 @@ def create_app(
         lifespan=lifespan,
     )
     register_exception_handlers(app)
+    # Last added = outermost: request ids are assigned first, so even a 413 carries one.
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        max_body_bytes=settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES,
+    )
     app.add_middleware(RequestIdMiddleware)
     app.include_router(bulk.router)
     app.include_router(ws.router)
