@@ -248,6 +248,8 @@ def test_health_and_index(api: TestClient, fake: FakeUpstream) -> None:
     assert health["upstream"]["reachable"] is None
     assert fake.calls == []  # shallow health never touches upstream
 
+    assert api.head("/health").status_code == 200
+
     deep = api.get("/health?deep=true").json()
     assert deep["upstream"]["reachable"] is True
 

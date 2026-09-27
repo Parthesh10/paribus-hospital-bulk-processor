@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response
 
 from app import __version__
 from app.api.deps import ServicesDep
@@ -35,3 +35,9 @@ async def health(
             reachable=reachable,
         ),
     )
+
+
+@router.head("/health", include_in_schema=False)
+async def health_head() -> Response:
+    """Many uptime monitors probe with HEAD. Kept out of the schema to avoid a duplicate op id."""
+    return Response()
