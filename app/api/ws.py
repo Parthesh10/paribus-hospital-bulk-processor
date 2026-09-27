@@ -9,11 +9,12 @@ Subscribing *before* reading the snapshot guarantees no event is lost between th
 state-carrying, so any overlap with the snapshot is harmless.
 """
 
-import asyncio
 import contextlib
 from uuid import UUID
 
+import anyio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+from starlette.websockets import WebSocketState
 
 from app.api.deps import ServicesDep
 from app.services.progress import Event, snapshot_event
@@ -42,27 +43,31 @@ async def batch_progress(websocket: WebSocket, batch_id: UUID, services: Service
             await websocket.close()
             return
 
-        async def pump() -> None:
-            while True:
-                event = await queue.get()
-                await websocket.send_json(event)
-                if _is_terminal(event):
-                    return
+        # Structured concurrency: both children live inside the task group, so if either
+        # finishes, or the connection handler itself is cancelled, the other is cancelled too.
+        # No orphaned tasks.
+        async with anyio.create_task_group() as tg:
 
-        async def watch_disconnect() -> None:
-            # Detect a client that goes away while no events are flowing.
-            while (await websocket.receive())["type"] != "websocket.disconnect":
-                pass
+            async def pump() -> None:
+                while True:
+                    event = await queue.get()
+                    await websocket.send_json(event)
+                    if _is_terminal(event):
+                        break
+                tg.cancel_scope.cancel()
 
-        tasks = {asyncio.create_task(pump()), asyncio.create_task(watch_disconnect())}
-        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-        for task in pending:
-            task.cancel()
-        await asyncio.gather(*pending, return_exceptions=True)
-        for task in done:
-            task.result()  # surface unexpected errors
-        with contextlib.suppress(RuntimeError, WebSocketDisconnect):
-            await websocket.close()
+            async def watch_disconnect() -> None:
+                # Detect a client that goes away while no events are flowing.
+                while (await websocket.receive())["type"] != "websocket.disconnect":
+                    pass
+                tg.cancel_scope.cancel()
+
+            tg.start_soon(pump)
+            tg.start_soon(watch_disconnect)
+
+        if websocket.application_state is WebSocketState.CONNECTED:
+            with contextlib.suppress(RuntimeError, WebSocketDisconnect):
+                await websocket.close()
     except WebSocketDisconnect:
         pass
     finally:
